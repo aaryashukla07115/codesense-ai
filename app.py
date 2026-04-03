@@ -11,7 +11,7 @@ init_db()
 
 try:
     import os
-img = Image.open(os.path.join(os.path.dirname(__file__), "static", "logo.png"))
+    img = Image.open(os.path.join(os.path.dirname(__file__), "static", "logo.png"))
     page_icon = img
 except:
     page_icon = "🔍"
