@@ -9,12 +9,11 @@ from auth import init_db, login, signup
 load_dotenv()
 init_db()
 
+# Streamlit Cloud secrets support
 try:
-    import os
-    img = Image.open(os.path.join(os.path.dirname(__file__), "static", "logo.png"))
-    page_icon = img
+    os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
 except:
-    page_icon = "🔍"
+    pass
 
 st.set_page_config(
     page_title="CodeSense AI",
@@ -269,7 +268,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ── LIVE STATS ──
+    # Live Stats
     history = st.session_state.history
     total   = st.session_state.total_reviews
     avg_sc  = round(sum(h['score'] for h in history) / len(history), 1) if history else 0
@@ -300,7 +299,6 @@ with st.sidebar:
         <span style='font-size:18px;font-weight:800;color:{best_color}'>{best_sc}/100</span>
     </div>""", unsafe_allow_html=True)
 
-    # Last score big
     if st.session_state.done and st.session_state.results:
         last_sc    = st.session_state.results['report']['score']
         last_color = "#10b981" if last_sc >= 80 else "#f59e0b" if last_sc >= 60 else "#ef4444"
@@ -314,7 +312,6 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Recent reviews
     st.markdown(f"<p style='font-size:11px;font-weight:700;color:{TEXT3};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px'>🕐 Recent Reviews</p>", unsafe_allow_html=True)
     if not history:
         st.markdown(f"<div style='font-size:12px;color:{TEXT3};text-align:center;padding:8px'>No reviews yet</div>", unsafe_allow_html=True)
@@ -363,7 +360,7 @@ if not MODULES_OK:
     st.stop()
 
 # ════════════════════════════════════════
-#  6 TABS (AI Fix + AI Chat removed)
+#  TABS
 # ════════════════════════════════════════
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📝 Editor",
@@ -374,9 +371,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📋 Report",
 ])
 
-# ─────────────────────────────────────
-# TAB 1 — EDITOR
-# ─────────────────────────────────────
+# ── TAB 1: EDITOR ──
 with tab1:
     st.markdown("### 📝 Code Editor")
 
@@ -411,7 +406,6 @@ with tab1:
             st.session_state.suggestion  = ""
             st.rerun()
 
-    # Code Execution
     if exec_btn:
         if not st.session_state.code.strip():
             st.warning("⚠️ Paste code first!")
@@ -457,7 +451,6 @@ with tab1:
         elif out['rc'] != -1:
             st.error(f"❌ Exit code: {out['rc']}")
 
-    # Full Review
     if run_btn:
         if not st.session_state.code.strip():
             st.warning("⚠️ Paste code first!")
@@ -475,12 +468,9 @@ with tab1:
                         prog.progress(80, "✓ Smells done...")
                 report = generate_report(analysis, complexity, smells, language)
                 prog.progress(100, "✅ Done!")
-
                 results = {
-                    'analysis':   analysis,
-                    'complexity': complexity,
-                    'smells':     smells,
-                    'report':     report,
+                    'analysis': analysis, 'complexity': complexity,
+                    'smells': smells, 'report': report,
                 }
                 st.session_state.results       = results
                 st.session_state.done          = True
@@ -501,16 +491,13 @@ with tab1:
 
             sc   = report['score']
             icon = "🟢" if sc >= 80 else "🟡" if sc >= 60 else "🔴"
-
             if analysis.get('syntax_error'):
-                st.error(f"🔴 Syntax Error found! Score: **{sc}/100** — Fix the syntax error first!")
+                st.error(f"🔴 Syntax Error! Score: **{sc}/100** — Fix syntax error first!")
             else:
                 st.success(f"{icon} Done! Score: **{sc}/100** | Issues: **{analysis['stats']['total']}** | Smells: **{len(smells)}**")
-            st.info("👆 Check 'Issues & AI Fix' tab for details + AI suggestions!")
+            st.info("👆 Check 'Issues & AI Fix' tab for details!")
 
-# ─────────────────────────────────────
-# TAB 2 — ISSUES & AI FIX (combined)
-# ─────────────────────────────────────
+# ── TAB 2: ISSUES & AI FIX ──
 with tab2:
     if not st.session_state.done:
         st.info("⬅️ Editor mein code paste karo aur **Run Full Review** dabao.")
@@ -519,27 +506,24 @@ with tab2:
         stats   = st.session_state.results['analysis']['stats']
         is_synt = st.session_state.results['analysis'].get('syntax_error', False)
 
-        # Stats row
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("🔴 Critical", stats.get('critical', 0))
         c2.metric("🟡 Warnings", stats.get('warnings', 0))
         c3.metric("🔵 Info",     stats.get('info', 0))
         c4.metric("📄 Lines",    stats.get('lines', 0))
 
-        # Syntax error banner
         if is_synt:
-            st.error("🚨 **Syntax Error detected!** Code will not run. Fix the syntax error first before other issues.")
+            st.error("🚨 Syntax Error detected! Fix it first.")
 
         st.markdown("---")
 
-        # Issues list
         if not issues:
             st.success("✅ No issues found — excellent code!")
         else:
-            filt  = st.selectbox("Filter by severity:", ["All","critical","warning","info"], key="iss_filt")
+            filt  = st.selectbox("Filter:", ["All","critical","warning","info"], key="iss_filt")
             shown = issues if filt == "All" else [i for i in issues if i['severity'] == filt]
-            SICONS = {'critical': '🔴', 'warning': '🟡', 'info': '🔵'}
-            st.markdown(f"**{len(shown)} issue(s) shown:**")
+            SICONS = {'critical':'🔴','warning':'🟡','info':'🔵'}
+            st.markdown(f"**{len(shown)} issue(s):**")
             for issue in shown:
                 with st.expander(f"{SICONS.get(issue['severity'],'⚪')} **{issue['title']}** — Line {issue.get('line','?')} | {issue['category']}"):
                     st.markdown(f"**Problem:** {issue['description']}")
@@ -547,36 +531,26 @@ with tab2:
                         st.code(issue['code'], language=language)
 
         st.markdown("---")
-
-        # ── AI SUGGEST FIX SECTION ──
         st.markdown("### 🤖 AI Code Suggestion")
         st.markdown("AI tumhara **poora code fix** karke corrected version suggest karega.")
 
         api_key = os.getenv("ANTHROPIC_API_KEY", "")
         if not api_key or "yahan" in api_key:
-            st.error("❌ API Key missing. Add in `.env` file.")
+            st.error("❌ API Key missing.")
         else:
-            suggest_btn = st.button(
-                "✨ Get AI Suggestion for Fixed Code",
-                type="primary",
-                use_container_width=True,
-                key="suggest_btn"
-            )
-
-            if suggest_btn:
-                with st.spinner("🤖 AI is analyzing and writing the fixed version..."):
+            if st.button("✨ Get AI Suggestion for Fixed Code", type="primary",
+                         use_container_width=True, key="suggest_btn"):
+                with st.spinner("🤖 AI is fixing your code..."):
                     try:
                         client_ai = anthropic.Anthropic(api_key=api_key)
-
-                        # Build issues summary for prompt
                         issue_list = "\n".join([
                             f"- Line {iss.get('line','?')}: [{iss['severity'].upper()}] {iss['title']} — {iss['description']}"
                             for iss in issues
-                        ]) if issues else "No specific issues detected by static analysis."
+                        ]) if issues else "No specific issues detected."
 
                         prompt = f"""You are a senior {language} developer.
 
-The following {language} code has problems. Here are the detected issues:
+Issues found:
 {issue_list}
 
 ORIGINAL CODE:
@@ -584,22 +558,16 @@ ORIGINAL CODE:
 {st.session_state.code}
 ```
 
-Your job:
-1. Fix ALL the above issues plus any other problems you notice
-2. Return the complete corrected code
-3. List every change you made
-
-Return in EXACTLY this format:
+Fix ALL issues. Return EXACTLY:
 
 FIXED_CODE:
 ```{language}
-[complete corrected code here]
+[complete fixed code]
 ```
 
 CHANGES:
-- [change 1: what was wrong → what you did]
-- [change 2]
-- [change 3]"""
+- [change 1]
+- [change 2]"""
 
                         msg = client_ai.messages.create(
                             model="claude-opus-4-5",
@@ -607,10 +575,7 @@ CHANGES:
                             messages=[{"role": "user", "content": prompt}]
                         )
                         response = msg.content[0].text
-
-                        # Parse
-                        fixed_code = ""
-                        changes    = ""
+                        fixed_code, changes = "", ""
                         if "FIXED_CODE:" in response:
                             after = response.split("FIXED_CODE:")[1]
                             if "```" in after:
@@ -620,42 +585,31 @@ CHANGES:
                                 fixed_code = after[s:e].strip()
                         if "CHANGES:" in response:
                             changes = response.split("CHANGES:")[1].strip()
-
-                        st.session_state.suggestion        = fixed_code if fixed_code else response
+                        st.session_state.suggestion         = fixed_code if fixed_code else response
                         st.session_state.suggestion_changes = changes
-
                     except Exception as e:
                         st.error(f"❌ AI Error: {str(e)}")
 
-            # Show suggestion
             if st.session_state.get('suggestion'):
                 st.markdown("---")
                 st.markdown("#### 📊 Before vs After")
-
                 col_orig, col_fix = st.columns(2)
                 with col_orig:
-                    st.markdown("""<div style='background:rgba(239,68,68,0.1);
-                        border:1px solid #ef4444;border-radius:8px;
-                        padding:8px 14px;margin-bottom:8px;
-                        font-weight:700;color:#ef4444'>❌ Your Code (with issues)</div>""",
-                        unsafe_allow_html=True)
+                    st.markdown("""<div style='background:rgba(239,68,68,0.1);border:1px solid #ef4444;
+                        border-radius:8px;padding:8px 14px;margin-bottom:8px;
+                        font-weight:700;color:#ef4444'>❌ Your Code</div>""", unsafe_allow_html=True)
                     st.code(st.session_state.code, language=language)
-
                 with col_fix:
-                    st.markdown("""<div style='background:rgba(16,185,129,0.1);
-                        border:1px solid #10b981;border-radius:8px;
-                        padding:8px 14px;margin-bottom:8px;
-                        font-weight:700;color:#10b981'>✅ AI Fixed Version</div>""",
-                        unsafe_allow_html=True)
+                    st.markdown("""<div style='background:rgba(16,185,129,0.1);border:1px solid #10b981;
+                        border-radius:8px;padding:8px 14px;margin-bottom:8px;
+                        font-weight:700;color:#10b981'>✅ AI Fixed</div>""", unsafe_allow_html=True)
                     st.code(st.session_state.suggestion, language=language)
 
-                # Changes list
                 if st.session_state.get('suggestion_changes'):
-                    st.markdown("#### 📝 Changes Made:")
+                    st.markdown("#### 📝 Changes:")
                     for line in st.session_state.suggestion_changes.strip().split('\n'):
                         if line.strip():
-                            st.markdown(f"""<div style='background:{SURFACE};
-                                border-left:3px solid #00e5ff;
+                            st.markdown(f"""<div style='background:{SURFACE};border-left:3px solid #00e5ff;
                                 border-radius:0 6px 6px 0;padding:8px 14px;margin-bottom:4px;
                                 font-size:13px;color:{TEXT2}'>{line.strip()}</div>""",
                                 unsafe_allow_html=True)
@@ -663,40 +617,34 @@ CHANGES:
                 st.markdown("---")
                 ac1, ac2, ac3 = st.columns(3)
                 with ac1:
-                    if st.button("✅ Use This Code in Editor", use_container_width=True, key="use_sug_btn"):
+                    if st.button("✅ Use in Editor", use_container_width=True, key="use_sug_btn"):
                         st.session_state.code       = st.session_state.suggestion
                         st.session_state.suggestion = ""
                         st.session_state.done       = False
-                        st.success("✅ Fixed code loaded! Run Review again to verify.")
+                        st.success("✅ Loaded! Run Review again.")
                         st.rerun()
                 with ac2:
-                    st.download_button(
-                        "📥 Download Fixed Code",
+                    st.download_button("📥 Download Fixed",
                         data=st.session_state.suggestion,
                         file_name=f"fixed.{'py' if language=='python' else language[:2]}",
-                        mime="text/plain",
-                        use_container_width=True,
-                        key="dl_sug_btn"
-                    )
+                        mime="text/plain", use_container_width=True, key="dl_sug_btn")
                 with ac3:
-                    if st.button("🔄 Clear Suggestion", use_container_width=True, key="clear_sug_btn"):
+                    if st.button("🔄 Clear", use_container_width=True, key="clear_sug_btn"):
                         st.session_state.suggestion = ""
                         st.rerun()
 
-# ─────────────────────────────────────
-# TAB 3 — COMPLEXITY
-# ─────────────────────────────────────
+# ── TAB 3: COMPLEXITY ──
 with tab3:
     if not st.session_state.done:
         st.info("⬅️ Editor mein code paste karo aur **Run Full Review** dabao.")
     elif st.session_state.results['analysis'].get('syntax_error'):
-        st.error("❌ Syntax error hai code mein — pehle fix karo.")
+        st.error("❌ Syntax error — pehle fix karo.")
     elif language != 'python':
-        st.warning("⚠️ Complexity analysis only for Python.")
+        st.warning("⚠️ Complexity only for Python.")
     else:
         cx = st.session_state.results['complexity']
         if not cx:
-            st.info("No functions found in code.")
+            st.info("No functions found.")
         else:
             avg = sum(f['cyclomatic'] for f in cx) / len(cx)
             c1, c2, c3 = st.columns(3)
@@ -709,132 +657,112 @@ with tab3:
                 with st.expander(f"**{fn['name']}()** — Grade: **{gr}** | CC: **{cc}** | Lines: {fn['lines']}"):
                     a, b, c = st.columns(3)
                     a.metric("Cyclomatic", cc)
-                    b.metric("Lines",      fn['lines'])
-                    c.metric("Grade",      gr)
+                    b.metric("Lines", fn['lines'])
+                    c.metric("Grade", gr)
                     if cc <= 5:    st.success("✅ Excellent!")
-                    elif cc <= 10: st.info("🔵 Good — slightly simplify.")
-                    elif cc <= 15: st.warning("🟡 High — consider refactoring.")
+                    elif cc <= 10: st.info("🔵 Good.")
+                    elif cc <= 15: st.warning("🟡 High — refactor.")
                     else:          st.error("🔴 Very High — break into smaller functions!")
-                    st.progress(min(cc / 20.0, 1.0), text=f"Complexity: {cc}/20")
+                    st.progress(min(cc/20.0,1.0), text=f"Complexity: {cc}/20")
 
-# ─────────────────────────────────────
-# TAB 4 — CODE SMELLS
-# ─────────────────────────────────────
+# ── TAB 4: CODE SMELLS ──
 with tab4:
     if not st.session_state.done:
         st.info("⬅️ Editor mein code paste karo aur **Run Full Review** dabao.")
     elif st.session_state.results['analysis'].get('syntax_error'):
-        st.error("❌ Syntax error hai — pehle fix karo.")
+        st.error("❌ Syntax error — pehle fix karo.")
     elif language != 'python':
         st.warning("⚠️ Smell detection only for Python.")
     else:
         smells = st.session_state.results['smells']
         if not smells:
-            st.success("✅ No code smells — excellent!")
+            st.success("✅ No code smells!")
         else:
-            st.markdown(f"**{len(smells)} smell(s) detected:**")
+            st.markdown(f"**{len(smells)} smell(s):**")
             SI = {'Long Method':'📏','God Class':'👑','Dead Code':'💀',
                   'Magic Number':'🔮','Long Parameter List':'📝'}
             for impact, ico in [('High','🔴'),('Medium','🟡'),('Low','🔵')]:
-                grp = [s for s in smells if s['impact'] == impact]
+                grp = [s for s in smells if s['impact']==impact]
                 if not grp: continue
-                st.markdown(f"### {ico} {impact} Impact ({len(grp)})")
+                st.markdown(f"### {ico} {impact} ({len(grp)})")
                 for s in grp:
-                    with st.expander(f"{SI.get(s['type'],'🔍')} **{s['type']}** — {s['name']} | {s['location']}"):
+                    with st.expander(f"{SI.get(s['type'],'🔍')} **{s['type']}** — {s['name']}"):
                         st.markdown(f"**Problem:** {s['description']}")
                         st.markdown(f"**Fix:** `{s['refactoring']}`")
 
-# ─────────────────────────────────────
-# TAB 5 — STATS & HISTORY
-# ─────────────────────────────────────
+# ── TAB 5: STATS & HISTORY ──
 with tab5:
     st.markdown("### 📈 Review Stats & History")
     history = st.session_state.history
     total   = st.session_state.total_reviews
 
-    avg_sc   = round(sum(h['score'] for h in history) / len(history), 1) if history else 0
+    avg_sc   = round(sum(h['score'] for h in history)/len(history),1) if history else 0
     best_sc  = max((h['score'] for h in history), default=0)
-    worst_sc = min((h['score'] for h in history), default=0)
-    tot_iss  = sum(h.get('issues', 0) for h in history)
-    tot_sml  = sum(h.get('smells', 0) for h in history)
+    tot_iss  = sum(h.get('issues',0) for h in history)
+    tot_sml  = sum(h.get('smells',0) for h in history)
 
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("🔍 Reviews",      total)
-    m2.metric("⭐ Avg Score",    avg_sc)
-    m3.metric("🏆 Best Score",   f"{best_sc}/100")
-    m4.metric("🐛 Total Issues", tot_iss)
-    m5.metric("🧪 Total Smells", tot_sml)
+    m1,m2,m3,m4,m5 = st.columns(5)
+    m1.metric("🔍 Reviews",     total)
+    m2.metric("⭐ Avg Score",   avg_sc)
+    m3.metric("🏆 Best",        f"{best_sc}/100")
+    m4.metric("🐛 Issues",      tot_iss)
+    m5.metric("🧪 Smells",      tot_sml)
 
     if avg_sc > 0:
         st.markdown("---")
-        st.markdown("#### 🎯 Quality Progress")
-        pc1, pc2 = st.columns([3, 1])
+        pc1, pc2 = st.columns([3,1])
         with pc1:
-            st.progress(avg_sc / 100, text=f"Average Quality: {avg_sc}/100")
+            st.progress(avg_sc/100, text=f"Avg Quality: {avg_sc}/100")
         with pc2:
-            if avg_sc >= 80:   st.success("🌟 Excellent!")
-            elif avg_sc >= 60: st.warning("📈 Improving!")
-            else:              st.error("💪 Keep Going!")
+            if avg_sc>=80:   st.success("🌟 Excellent!")
+            elif avg_sc>=60: st.warning("📈 Improving!")
+            else:            st.error("💪 Keep Going!")
 
     if len(history) >= 2:
         st.markdown("---")
-        st.markdown("#### 📉 Score Trend")
-        st.line_chart(
-            {"Review": [f"#{i+1}" for i in range(len(history))],
-             "Score":  [h['score'] for h in history]},
-            x="Review", y="Score"
-        )
+        st.line_chart({"Review":[f"#{i+1}" for i in range(len(history))],
+                       "Score":[h['score'] for h in history]},
+                      x="Review", y="Score")
 
     st.markdown("---")
-    st.markdown("#### 🕐 All Reviews")
-
     if not history:
         st.markdown(f"""<div style='background:{SURFACE};border:1px solid {BORDER};
             border-radius:12px;padding:40px;text-align:center'>
             <div style='font-size:40px'>📭</div>
-            <div style='font-size:16px;margin-top:10px;color:{TEXT2}'>No reviews yet!</div>
-            <div style='font-size:13px;margin-top:6px;color:{TEXT3}'>Run your first review to see history.</div>
+            <div style='font-size:16px;color:{TEXT2};margin-top:10px'>No reviews yet!</div>
         </div>""", unsafe_allow_html=True)
     else:
         for i, h in enumerate(reversed(history)):
-            review_num = total - i
-            sc_icon = "🟢" if h['score'] >= 80 else "🟡" if h['score'] >= 60 else "🔴"
-            with st.expander(
-                f"{sc_icon} Review #{review_num} — Score: **{h['score']}/100** | {h['lang'].upper()} | {h['time']} | Issues: {h.get('issues',0)} | Smells: {h.get('smells',0)}"
-            ):
-                hc1, hc2, hc3, hc4 = st.columns(4)
+            sc_icon = "🟢" if h['score']>=80 else "🟡" if h['score']>=60 else "🔴"
+            with st.expander(f"{sc_icon} Review #{total-i} — {h['score']}/100 | {h['lang'].upper()} | {h['time']} | Issues:{h.get('issues',0)} Smells:{h.get('smells',0)}"):
+                hc1,hc2,hc3,hc4 = st.columns(4)
                 hc1.metric("Score",    f"{h['score']}/100")
                 hc2.metric("Language", h['lang'].upper())
-                hc3.metric("Issues",   h.get('issues', 0))
-                hc4.metric("Smells",   h.get('smells', 0))
+                hc3.metric("Issues",   h.get('issues',0))
+                hc4.metric("Smells",   h.get('smells',0))
                 if h.get('code'):
-                    preview = h['code'][:300] + ("..." if len(h['code']) > 300 else "")
-                    st.code(preview, language=h['lang'])
-                lc1, lc2 = st.columns(2)
+                    st.code(h['code'][:300]+("..." if len(h['code'])>300 else ""), language=h['lang'])
+                lc1,lc2 = st.columns(2)
                 with lc1:
                     if st.button("📂 Load Code", use_container_width=True, key=f"ld_code_{i}"):
                         st.session_state.code    = h['code']
                         st.session_state.results = h['results']
                         st.session_state.done    = True
-                        st.success("✅ Loaded!")
                         st.rerun()
                 with lc2:
                     if st.button("📊 Load Results", use_container_width=True, key=f"ld_res_{i}"):
                         st.session_state.results = h['results']
                         st.session_state.done    = True
-                        st.success("✅ Results loaded!")
                         st.rerun()
 
     if history:
         st.markdown("---")
-        if st.button("🗑️ Clear All History", use_container_width=True, key="clr_hist"):
+        if st.button("🗑️ Clear History", use_container_width=True, key="clr_hist"):
             st.session_state.history       = []
             st.session_state.total_reviews = 0
             st.rerun()
 
-# ─────────────────────────────────────
-# TAB 6 — REPORT
-# ─────────────────────────────────────
+# ── TAB 6: REPORT ──
 with tab6:
     if not st.session_state.done:
         st.info("⬅️ Editor mein code paste karo aur **Run Full Review** dabao.")
@@ -853,14 +781,14 @@ with tab6:
                 -webkit-background-clip:text;-webkit-text-fill-color:transparent'>
                 📋 Code Quality Report</div>
             <div style='color:{TEXT3};font-size:13px;margin-top:4px'>
-                {rpt['timestamp']} · {rpt['language'].upper()} · Reviewed by: {st.session_state.username}
+                {rpt['timestamp']} · {rpt['language'].upper()} · By: {st.session_state.username}
             </div>
         </div>""", unsafe_allow_html=True)
 
-        c1, c2, c3, c4, c5 = st.columns(5)
+        c1,c2,c3,c4,c5 = st.columns(5)
         c1.metric("⭐ Score",     f"{sc}/100")
-        c2.metric("🔴 Critical",  anal['stats'].get('critical', 0))
-        c3.metric("🟡 Warnings",  anal['stats'].get('warnings', 0))
+        c2.metric("🔴 Critical",  anal['stats'].get('critical',0))
+        c3.metric("🟡 Warnings",  anal['stats'].get('warnings',0))
         c4.metric("🧪 Smells",    len(sml))
         c5.metric("🔧 Functions", len(cxp))
         st.markdown("---")
@@ -868,20 +796,16 @@ with tab6:
         rd1, rd2 = st.columns(2)
         with rd1:
             st.markdown("### 📊 Dimension Scores")
-            dims = rpt.get('dimension_scores', {})
-            for dk, dl in [
-                ('correctness',     '🎯 Correctness'),
-                ('security',        '🔐 Security'),
-                ('performance',     '⚡ Performance'),
-                ('maintainability', '🔧 Maintainability'),
-                ('readability',     '📖 Readability'),
-            ]:
-                dv = dims.get(dk, 0)
+            dims = rpt.get('dimension_scores',{})
+            for dk,dl in [('correctness','🎯 Correctness'),('security','🔐 Security'),
+                          ('performance','⚡ Performance'),('maintainability','🔧 Maintainability'),
+                          ('readability','📖 Readability')]:
+                dv = dims.get(dk,0)
                 st.markdown(f"**{dl}** — {dv}/100")
-                st.progress(dv / 100)
+                st.progress(dv/100)
         with rd2:
             st.markdown("### 💡 Recommendations")
-            for ri, rec in enumerate(rpt.get('recommendations', []), 1):
+            for ri, rec in enumerate(rpt.get('recommendations',[]),1):
                 st.markdown(f"""<div style='background:{SURFACE};border:1px solid {BORDER};
                     border-radius:8px;padding:10px 14px;margin-bottom:8px;
                     font-size:13px;color:{TEXT2}'>
@@ -889,14 +813,9 @@ with tab6:
                     unsafe_allow_html=True)
 
         st.markdown("---")
-        st.download_button(
-            "📥 Download Full Report (JSON)",
-            data=json.dumps({
-                'user': st.session_state.username, 'report': rpt,
-                'issues': anal['issues'], 'complexity': cxp, 'smells': sml,
-            }, indent=2, default=str),
+        st.download_button("📥 Download Report (JSON)",
+            data=json.dumps({'user':st.session_state.username,'report':rpt,
+                'issues':anal['issues'],'complexity':cxp,'smells':sml},
+                indent=2, default=str),
             file_name=f"codesense_{language}_report.json",
-            mime="application/json",
-            use_container_width=True,
-            key="dl_report_btn"
-        )
+            mime="application/json", use_container_width=True, key="dl_report_btn")
