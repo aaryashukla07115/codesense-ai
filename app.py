@@ -11,7 +11,10 @@ init_db()
 
 # Streamlit Cloud secrets support
 try:
-    os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
+    if "ANTHROPIC_API_KEY" in st.secrets:
+        os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
+    if "GEMINI_API_KEY" in st.secrets:
+        os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
 except:
     pass
 
@@ -328,11 +331,11 @@ with st.sidebar:
                 st.rerun()
 
     st.markdown("---")
-    api_ok = os.getenv("ANTHROPIC_API_KEY", "")
-    if api_ok and "yahan" not in api_ok:
-        st.success("✅ API Key OK")
+    api_ok = os.getenv("GEMINI_API_KEY", "")
+    if api_ok:
+        st.success("✅ Gemini API OK")
     else:
-        st.error("❌ API Key missing!")
+        st.error("❌ Gemini API Key missing!")
 
 # ════════════════════════════════════════
 #  HEADER
@@ -534,9 +537,9 @@ with tab2:
         st.markdown("### 🤖 AI Code Suggestion")
         st.markdown("AI tumhara **poora code fix** karke corrected version suggest karega.")
 
-        api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        if not api_key or "yahan" in api_key:
-            st.error("❌ API Key missing.")
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key:
+            st.error("❌ Gemini API Key missing. Add GEMINI_API_KEY in .env or Streamlit Secrets.")
         else:
             if st.button("✨ Get AI Suggestion for Fixed Code", type="primary",
                          use_container_width=True, key="suggest_btn"):
