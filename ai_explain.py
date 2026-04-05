@@ -1,31 +1,37 @@
 import os
-import anthropic
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
+def get_client():
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        # Streamlit Cloud secrets
+        try:
+            import streamlit as st
+            api_key = st.secrets.get("GEMINI_API_KEY", "")
+        except:
+            pass
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel("gemini-1.5-flash")
+
 def explain_code(code: str, question: str, language: str) -> str:
-    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    """AI se code ke baare mein question ka jawab leta hai"""
+    try:
+        model = get_client()
+        prompt = f"""You are an expert {language} code reviewer.
 
-    prompt = f"""You are an expert {language} developer and code reviewer.
-
-The user has this {language} code:
+Code:
 ```{language}
-{code[:3000]}
+{code[:2000]}
 ```
 
-User's question: {question}
+Question: {question}
 
-Instructions:
-- Give a clear, direct answer
-- If there are bugs or errors, show the FIXED code with explanation
-- Use code examples to explain
-- Be specific — don't give vague answers
-- If code has issues, always show corrected version"""
+Give a clear, helpful answer. Use code examples where needed."""
 
-    message = client.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return message.content[0].text
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error: {str(e)}"
